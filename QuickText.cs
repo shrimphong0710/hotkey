@@ -13,12 +13,18 @@ namespace QuickText
     {
         [DllImport("user32.dll", SetLastError=true)] internal static extern bool RegisterHotKey(IntPtr h, int id, uint mods, uint key);
         [DllImport("user32.dll")] internal static extern bool UnregisterHotKey(IntPtr h, int id);
-        [DllImport("user32.dll")] internal static extern uint SendInput(uint count, INPUT[] inputs, int size);
+        [DllImport("user32.dll", SetLastError=true)] internal static extern uint SendInput(uint count, INPUT[] inputs, int size);
         [DllImport("user32.dll", CharSet=CharSet.Unicode)] internal static extern uint RegisterWindowMessage(string name);
         [DllImport("user32.dll")] internal static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
         [StructLayout(LayoutKind.Sequential)] internal struct INPUT { public uint type; public InputUnion data; }
-        [StructLayout(LayoutKind.Explicit)] internal struct InputUnion { [FieldOffset(0)] public KEYBDINPUT keyboard; }
+        [StructLayout(LayoutKind.Explicit)] internal struct InputUnion {
+            [FieldOffset(0)] public MOUSEINPUT mouse;
+            [FieldOffset(0)] public KEYBDINPUT keyboard;
+            [FieldOffset(0)] public HARDWAREINPUT hardware;
+        }
+        [StructLayout(LayoutKind.Sequential)] internal struct MOUSEINPUT { public int dx, dy; public uint mouseData, flags, time; public UIntPtr extra; }
         [StructLayout(LayoutKind.Sequential)] internal struct KEYBDINPUT { public ushort vk, scan; public uint flags, time; public UIntPtr extra; }
+        [StructLayout(LayoutKind.Sequential)] internal struct HARDWAREINPUT { public uint msg; public ushort paramL, paramH; }
         internal const uint ALT=1, CTRL=2, SHIFT=4, WIN=8, NOREPEAT=0x4000, KEYBOARD=1, KEYUP=2, UNICODE=4;
         internal static readonly uint SHOW_SETTINGS=RegisterWindowMessage("QuickText_ShowSettings_7D9E6B5A");
     }
@@ -100,6 +106,7 @@ namespace QuickText
         internal ShortcutItem Result;
         internal ShortcutDialog(ShortcutItem old){
             Text=old==null?"단축키 추가":"단축키 수정"; Font=new Font("맑은 고딕",9); FormBorderStyle=FormBorderStyle.FixedDialog;
+            Icon=Program.AppIcon;
             MaximizeBox=false;MinimizeBox=false;StartPosition=FormStartPosition.CenterParent;ClientSize=new Size(430,178);
             var l1=new Label{Text="입력할 문자 또는 문구",AutoSize=true,Location=new Point(18,17)};
             content.Location=new Point(21,40);content.Size=new Size(388,25);
@@ -127,6 +134,7 @@ namespace QuickText
         readonly ListView list=new ListView(); readonly Action<List<ShortcutItem>> apply; List<ShortcutItem> items;
         internal SettingsForm(List<ShortcutItem> source,Action<List<ShortcutItem>> onApply){
             items=Clone(source);apply=onApply;Text="바로문자 설정";Font=new Font("맑은 고딕",9);StartPosition=FormStartPosition.CenterScreen;
+            Icon=Program.AppIcon;
             MinimumSize=new Size(570,390);ClientSize=new Size(650,420);
             var title=new Label{Text="단축키를 누르면 지정한 내용이 현재 입력칸에 바로 입력됩니다.",AutoSize=true,Location=new Point(16,16)};
             list.Location=new Point(18,47);list.Size=new Size(614,300);list.Anchor=AnchorStyles.Top|AnchorStyles.Bottom|AnchorStyles.Left|AnchorStyles.Right;
@@ -152,7 +160,7 @@ namespace QuickText
         internal TrayApp(){
             items=Store.Load();hotkeys=new HotkeyWindow();hotkeys.Failed+=x=>tray.ShowBalloonTip(5000,"바로문자","사용 중인 단축키: "+x,ToolTipIcon.Warning);hotkeys.ShowSettingsRequested+=ShowSettings;
             var menu=new ContextMenuStrip();menu.Items.Add("설정 열기",null,(s,e)=>ShowSettings());menu.Items.Add(new ToolStripSeparator());menu.Items.Add("종료",null,(s,e)=>Exit());
-            tray=new NotifyIcon{Text="바로문자 - 단축키로 바로 입력",Icon=SystemIcons.Information,ContextMenuStrip=menu,Visible=true};tray.DoubleClick+=(s,e)=>ShowSettings();hotkeys.RegisterAll(items);
+            tray=new NotifyIcon{Text="바로문자 - 단축키로 바로 입력",Icon=Program.AppIcon,ContextMenuStrip=menu,Visible=true};tray.DoubleClick+=(s,e)=>ShowSettings();hotkeys.RegisterAll(items);
             Application.Idle+=OpenInitialSettings;
         }
         void OpenInitialSettings(object sender,EventArgs e){Application.Idle-=OpenInitialSettings;ShowSettings();}
@@ -163,6 +171,7 @@ namespace QuickText
 
     static class Program
     {
+        internal static Icon AppIcon { get { return Icon.ExtractAssociatedIcon(Application.ExecutablePath); } }
         [STAThread] static void Main(){bool created;using(var mutex=new Mutex(true,"Local\\QuickText_Korean_Utility",out created)){
             if(!created){Native.PostMessage(new IntPtr(0xffff),Native.SHOW_SETTINGS,IntPtr.Zero,IntPtr.Zero);return;}
             Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);Application.Run(new TrayApp());GC.KeepAlive(mutex);

@@ -13,6 +13,8 @@
 
 설정은 `%LOCALAPPDATA%\QuickText\shortcuts.txt`에 저장됩니다. 관리자 권한으로 실행된 프로그램에 입력하려면 바로문자도 관리자 권한으로 실행해야 합니다.
 
+앱 아이콘의 원본 이미지는 `assets/icon-source.png`, Windows 아이콘은 `assets/app.ico`에 있습니다.
+
 ## 다시 빌드하기
 
 Windows PowerShell에서 `build.ps1`을 실행하면 같은 폴더에 `QuickText.exe`가 생성됩니다.
